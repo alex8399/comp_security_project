@@ -1,7 +1,7 @@
 # DNS Spoofing Attack Tool (Educational Purpose Only)
 
 > **Disclaimer:** This code and documentation are for educational purposes only. 
-> DNS Spoofing (DNS Cache Poisoning) is illegal if used on networks without explicit permission. 
+> DNS Spoofing is illegal if used on networks without explicit permission. 
 > This project demonstrates how DNS trust can be abused and helps understand core network security vulnerabilities.
 
 ## Overview
