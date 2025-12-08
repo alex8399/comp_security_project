@@ -1,5 +1,9 @@
 from console import Console
+import logging
 import sys
+
+
+logging.basicConfig(level=logging.INFO)
 
 
 def main():
