@@ -47,7 +47,8 @@ Performs Network Address Translation. When the attacker forwards packets to the 
 
 Why this matters:
 Ensures the router sends return traffic back to the attacker, not directly to the victim. Without NAT, the victim might bypass the MITM.
-2. Get MAC Address
+
+### 2. Get MAC Address
 We need the hardware addresses (MAC) to construct valid Ethernet frames.
 
 ```python
@@ -65,7 +66,7 @@ This part sends a broadcast ARP request ("Who has this IP?") to the entire netwo
 
 It waits for a reply to find the MAC address mapped to the Victim's IP and the Gateway's IP.
 
-3. The Spoof (The "Lie")
+### 3. The Spoof 
 This is the core of the attack where we corrupt the ARP cache.
 
 
@@ -84,7 +85,8 @@ The Trick: We tell the Target (Victim) that the Spoof IP (Gateway) is located at
 
 Scapy's Role: We do not specify hwsrc (Source MAC). Scapy automatically fills this with the attacker's MAC address, which completes the deception.
 
-4. Running the Attack (The Loop)
+
+### 4. Running the Attack 
 ARP entries expire after a short time. We must keep lying to maintain the connection.
 
 ```python 
@@ -106,7 +108,8 @@ Two-Way Deception: We must poison both the Victim and the Gateway to intercept f
 
 time.sleep(2): We send these packets every 2 seconds to ensure the ARP cache stays poisoned and doesn't revert to the real MAC address.
 
-5. Restore (Cleanup)
+
+### 5. Restore (Cleanup)
 When we stop the attack (Ctrl+C), we must be polite and fix the network.
 
 ```python 
@@ -128,7 +131,5 @@ Configure Interface: Check your network interface name (e.g., eth0, wlan0) and u
 Set IPs: Update VICTIM_IP and WEBSITE_IP (Gateway IP).
 
 Execute: Run the script with root privileges:
-
-Bash
 
 sudo python3 arp_spoof.py
