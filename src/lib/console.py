@@ -1,26 +1,27 @@
+# console.py
 from arp_poisoning import ARPPoisoner
 from enum import Enum
 from typing import Collection
-
+import sys
 
 class AttackType(Enum):
     ARP_POISONING = "arp_pois"
 
-
 class Console:
-    
     @staticmethod
-    def execute(self, argv: Collection[str]) -> None:
+    def execute(argv: Collection[str]) -> None:
         if len(argv) == 0:
             raise ValueError("Attack type is not given.")
         
+        # FIX 1: Use .value to compare the string from command line with the Enum
         match argv[0]:
-            case AttackType.ARP_POISONING:
+            case AttackType.ARP_POISONING.value: 
                 if len(argv) != 4:
                     raise ValueError(
-                        "ARP Poisoning attack is invoking in the following way: \n\
-                        ./main.py ip1 ip2 interface")
+                        "ARP Poisoning attack is invoking in the following way: \n"
+                        "./main.py ip1 ip2 interface")
                 
-                ARPPoisoner.run(argv[1], argv[2], argv[3])
+                # FIX 2: Add () to instantiate the class before calling run
+                ARPPoisoner().run(argv[1], argv[2], argv[3])
             case _:
                 raise ValueError("Incorrect flag for attack type was provided.")

