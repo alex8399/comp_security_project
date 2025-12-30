@@ -189,29 +189,30 @@ docker-compose down
 
 ```mermaid
 graph TD
-    %% Node Definitions: External Wide Area Network
+    %% Node Definitions
     Internet((External WAN<br>Public DNS: 8.8.8.8))
 
     %% Subgraph: Docker Internal Bridge Network
-    subgraph LocalNet ["🔒 Docker Custom Bridge Network (CIDR: 172.25.0.0/16)"]
-        %% Style for the Subnet
+    subgraph LocalNet ["🔒 User-Defined Bridge Network"]
         style LocalNet fill:#f4f7f6,stroke:#333,stroke-width:2px,color:#2c3e50
+        
+        %% 네트워크 정보 노드 
+        NetInfo["ℹ️ Network Config<br>CIDR: 172.25.0.0/16"]
+        style NetInfo fill:#fff,stroke-dasharray: 5 5,stroke:#999,color:#555
 
-        %% Nodes: Network Entities
+        %% Nodes
         Gateway["Virtual Default Gateway<br>IP: 172.25.0.1<br>Role: Packet Forwarding & Routing"]
         Victim["Target Host (Victim)<br>IP: 172.25.0.10<br>State: ARP Cache Poisoned"]
-        Attacker["Adversary Node (Attacker)<br>IP: 172.25.0.20<br>Role: Man-in-the-Middle (MITM)"]
+        Attacker["Adversary Node (Attacker)<br>IP: 172.25.0.20<br>Role: MITM"]
 
-        %% Edge Connections (Links) WITH QUOTES ADDED
+        %% Connections
         Victim <==>|"L2 Adjacency<br>(Broadcast Domain)"| Attacker
-        
-        %% Traffic Flows WITH QUOTES ADDED
         Victim -.->|"Intended Traffic Path"| Gateway
-        Attacker <-->|"Intercepted Traffic Path<br>(IP Forwarding)"| Gateway
+        Attacker <==>|"Intercepted Traffic Path"| Gateway
     end
 
-    %% Edge Connection: Gateway to Internet
-    Gateway ===>|"Network Address Translation (NAT)"| Internet
+    %% Edge Connection
+    Gateway ===>|"NAT"| Internet
 
     %% Styling
     style Gateway fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#333
