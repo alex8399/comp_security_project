@@ -184,3 +184,38 @@ To stop the attack and remove all containers and networks:
 ```bash
 docker-compose down
 ```
+
+## Network Topology Diagram
+
+```mermaid
+graph TD
+    %% Node Definitions: External Wide Area Network
+    Internet((External WAN<br>Public DNS: 8.8.8.8))
+
+    %% Subgraph: Docker Internal Bridge Network
+    subgraph LocalNet ["🔒 Docker Custom Bridge Network (CIDR: 172.25.0.0/16)"]
+        %% Style for the Subnet
+        style LocalNet fill:#f4f7f6,stroke:#333,stroke-width:2px,color:#2c3e50
+
+        %% Nodes: Network Entities
+        Gateway["Virtual Default Gateway<br>IP: 172.25.0.1<br>Role: Packet Forwarding & Routing"]
+        Victim["Target Host (Victim)<br>IP: 172.25.0.10<br>State: ARP Cache Poisoned"]
+        Attacker["Adversary Node (Attacker)<br>IP: 172.25.0.20<br>Role: Man-in-the-Middle (MITM)"]
+
+        %% Edge Connections (Links) WITH QUOTES ADDED
+        Victim <==>|"L2 Adjacency<br>(Broadcast Domain)"| Attacker
+        
+        %% Traffic Flows WITH QUOTES ADDED
+        Victim -.->|"Intended Traffic Path"| Gateway
+        Attacker <-->|"Intercepted Traffic Path<br>(IP Forwarding)"| Gateway
+    end
+
+    %% Edge Connection: Gateway to Internet
+    Gateway ===>|"Network Address Translation (NAT)"| Internet
+
+    %% Styling
+    style Gateway fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#333
+    style Victim fill:#d1e7dd,stroke:#198754,stroke-width:2px,color:#333
+    style Attacker fill:#f8d7da,stroke:#dc3545,stroke-width:2px,color:#333
+    style Internet fill:#e2e3e5,stroke:#6c757d,color:#333
+```
