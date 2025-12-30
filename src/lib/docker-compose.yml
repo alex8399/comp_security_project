@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  # 1. (Attacker)
+  attacker:
+    build: .                 
+    container_name: attacker
+    privileged: true         
+    tty: true                
+    networks:
+      security_net:
+        ipv4_address: 172.25.0.20
+
+  # 2.  (Victim)
+  victim:
+    image: alpine           
+    container_name: victim
+    command: ping 8.8.8.8    # traffic to website
+    networks:
+      security_net:
+        ipv4_address: 172.25.0.10
+
+# 3. (172.25.x.x range) 
+networks:
+  security_net:
+    driver: bridge # our router
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
