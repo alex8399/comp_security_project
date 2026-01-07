@@ -4,6 +4,10 @@ from dns_spoofing import DNSSpoofer
 from enum import Enum
 from typing import Collection
 import sys
+import logging
+
+
+logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
 
 class AttackType(Enum):
