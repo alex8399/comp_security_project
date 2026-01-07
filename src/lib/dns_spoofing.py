@@ -23,7 +23,6 @@ class DNSSpoofer:
             
         logging.info("DNS spoofing finished")
         
-    
     @staticmethod
     def is_dns_query(pkt):
         return pkt.haslayer(DNS) and pkt[DNS].qr == 0
