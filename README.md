@@ -1,13 +1,12 @@
-# ARP Poisoning Attack Tool (Educational Purpose Only)
+# Attack Tool (Educational Purpose Only)
+
+# ARP Poisoning
 
 > **Disclaimer:** This code and documentation are for educational purposes only. ARP Spoofing is illegal if used on networks without explicit permission. This project is intended to demonstrate how Man-in-the-Middle (MITM) attacks work and how to understand network vulnerabilities.
 
 ## Overview
 This script performs an ARP Poisoning (Spoofing) attack using Python and Scapy. It establishes a Man-in-the-Middle (MITM) position by tricking a **Victim** and a **Gateway (Website/Router)** into sending their traffic through the **Attacker's** machine. This allows the attacker to intercept, view, or modify packets in transit.
 
----
-
-## Preconditions
 For this attack to work successfully, the following conditions must be met:
 
 1. **Same Subnet:** The Attacker, Victim, and Gateway must be on the same Local Area Network (LAN). ARP packets are broadcast only within a subnet and do not travel across routers.
@@ -220,3 +219,37 @@ graph TD
     style Attacker fill:#f8d7da,stroke:#dc3545,stroke-width:2px,color:#333
     style Internet fill:#e2e3e5,stroke:#6c757d,color:#333
 ```
+# DNS Spoofing
+
+> **Disclaimer:** This code and documentation are for educational purposes only. 
+> DNS Spoofing is illegal if used on networks without explicit permission. 
+> This project demonstrates how DNS trust can be abused and helps understand core network security vulnerabilities.
+
+## Overview
+This tool performs a DNS Spoofing (DNS Cache Poisoning) attack by sending forged DNS responses to a target. 
+The goal is to trick a **Client** or **DNS Resolver** into accepting a fake DNS record, causing the victim to be redirected to an **attacker-controlled IP address** instead of the legitimate server.  
+Once the spoofed entry is cached, all future requests for the targeted domain will resolve to the attacker’s machine until the cache expires.
+
+## Preconditions
+For DNS spoofing to work successfully, the following conditions must be met:
+
+1. **Unauthenticated DNS (No DNSSEC):**  
+   The DNS resolver must not validate DNSSEC signatures. Without DNSSEC, DNS responses are not cryptographically verified and can be forged.
+
+2. **Plaintext DNS Traffic:**  
+   The victim must be using standard DNS over UDP port 53.  
+   *Encrypted DNS (DoH/DoT) prevents this attack.*
+
+3. **Ability to Send or Inject Forged DNS Responses:**  
+   The attacker must be able to deliver spoofed packets that appear to come from an authoritative DNS server.  
+   This is typically possible when the attacker is:
+   * on the same LAN,  
+   * performing ARP spoofing, or  
+   * on a network that allows IP spoofing.
+
+4. **Caching Resolver in Use:**  
+   The target must rely on a DNS resolver that caches responses. A poisoned entry in the cache will impact all clients that query that resolver.
+
+5. **Weak or Predictable DNS Entropy:**  
+   Successful spoofing requires guessing DNS transaction IDs and source ports.  
+   Resolvers with weak randomization are significantly more vulnerable.
