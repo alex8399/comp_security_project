@@ -1,29 +1,37 @@
 version: '3.8'
 
 services:
-  # 1. (Attacker)
+  # [attacker]
   attacker:
-    build: .                 
+    build: .
     container_name: attacker
-    privileged: true         
-    tty: true                
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - .:/app
+
+    command: tail -f /dev/null
     networks:
       security_net:
         ipv4_address: 172.25.0.20
 
-  # 2.  (Victim)
+  # [victim]
   victim:
-    image: alpine           
+    image: alpine:latest
     container_name: victim
-    command: ping 8.8.8.8    # traffic to website
+    # You always go trhough dns via dns server(not docker internal dns server)
+    dns: 
+      - 8.8.8.8
+    command: >
+      sh -c "apk add --no-cache curl bind-tools iputils && tail -f /dev/null"
     networks:
       security_net:
         ipv4_address: 172.25.0.10
 
-# 3. (172.25.x.x range) 
 networks:
   security_net:
-    driver: bridge # our router
+    driver: bridge
     ipam:
       config:
         - subnet: 172.25.0.0/16
+          gateway: 172.25.0.1

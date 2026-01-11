@@ -5,7 +5,10 @@ RUN apt-get update && apt-get install -y \
     iptables \
     net-tools \
     iproute2 \
+    dnsutils \
     iputils-ping \
+    libpcap-dev \
+    tcpdump \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
