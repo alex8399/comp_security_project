@@ -337,9 +337,9 @@ graph TD
 
     %% Link Styling
     linkStyle 3 stroke:#dc3545,stroke-width:3px,color:red;
+```
 
-
-# SSL Stripping Attack Tool (Educational Purpose Only)
+# SSL Stripping Attack Tool
 
 > **Disclaimer:** This code and documentation are for educational purposes only. SSL Stripping is illegal if used on networks without explicit permission. This project demonstrates how insecure HTTP connections and improper HTTPS enforcement can be exploited to compromise user security.
 
