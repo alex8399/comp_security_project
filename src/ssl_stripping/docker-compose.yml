@@ -1,0 +1,59 @@
+version: '3'
+
+services:
+  # Server
+  webserver:
+    image: nginx:alpine
+    volumes:
+      - ./html:/usr/share/nginx/html
+    networks:
+      server_net:
+        ipv4_address: 192.168.10.100
+  
+    command: >
+      sh -c "ip route del default &&
+             ip route add default via 192.168.10.20 &&
+             nginx -g 'daemon off;'"
+    cap_add:
+      - NET_ADMIN
+
+  # Router
+  attacker:
+    build: ./attacker
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+    networks:
+      client_net:
+        ipv4_address: 10.0.0.20
+      server_net:
+        ipv4_address: 192.168.10.20
+
+  # Victim (10.0.0.x) is islocated here
+  victim:
+    image: alpine:latest
+    cap_add:
+      - NET_ADMIN
+    networks:
+      client_net:
+        ipv4_address: 10.0.0.10
+
+    command: >
+      sh -c "apk add --no-cache curl &&
+             ip route del default &&
+             ip route add default via 10.0.0.20 &&
+             tail -f /dev/null"
+
+
+networks:
+  client_net: 
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.0.0/24
+  server_net: 
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.10.0/24
