@@ -337,7 +337,7 @@ graph TD
 
     %% Link Styling
     linkStyle 3 stroke:#dc3545,stroke-width:3px,color:red;
-
+```
 
 # SSL Stripping Attack Tool (Educational Purpose Only)
 
