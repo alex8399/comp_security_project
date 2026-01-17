@@ -381,3 +381,27 @@ For SSL Stripping to work successfully, the following conditions must be met:
 
 ---
 
+```mermaid
+graph LR
+    subgraph Client_Network ["&nbsp;&nbsp;&nbsp;&nbsp; 🔒 Client Network (10.0.0.0/24) &nbsp;&nbsp;&nbsp;&nbsp;"]
+        direction TB
+        Victim(User / Victim<br/>10.0.0.10)
+    end
+
+    subgraph Server_Network ["&nbsp;&nbsp;&nbsp;&nbsp; 🌍 Server Network (192.168.10.0/24) &nbsp;&nbsp;&nbsp;&nbsp;"]
+        direction TB
+        Webserver(Bank Server<br/>192.168.10.100)
+    end
+
+    %% Attacker acts as a Router connecting both
+    Attacker{{"☠️ Attacker (MITM)<br/>(Gateway & Router)"}}
+
+    %% Connections
+    Victim -- "Gateway: 10.0.0.20" --> Attacker
+    Attacker -- "Forwarding Traffic" --> Webserver
+
+    %% Styling
+    style Victim fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    style Webserver fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Attacker fill:#ffebee,stroke:#c62828,stroke-width:4px
+```
