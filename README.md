@@ -381,6 +381,63 @@ For SSL Stripping to work successfully, the following conditions must be met:
 
 ---
 
+## How to Run the SSL Stripping Lab
+
+Follow these steps to set up the environment, launch the DNS Spoofing attack, and verify the results.
+
+### 1. Setup & Start Environment
+Initialize the isolated Docker network. This will build the containers and set up the routing rules.
+
+```bash
+# Clean up previous containers
+docker-compose down
+
+# Build and start the environment
+docker-compose up -d --build
+```
+
+### 2.Verify Original Server Content
+Before the attack, confirm that the target website is securely configured with HTTPS links.
+```bash
+docker exec ssl_stripping-webserver-1 cat /usr/share/nginx/html/index.html
+```
+Check Point: Verify the output contains <a href="https://www.google.com">.
+
+
+### 3. Launch the attack
+Start the SSL Stripping script on the attacker node. This script uses NetfilterQueue and Scapy to intercept packets.
+
+```bash
+docker exec -it ssl_stripping-attacker-1 python /app/ssl_stripping.py
+```
+Output: You should see [*] Listening for packets.... Keep this terminal open.
+
+### 4. Victim Connection
+Open a new terminal and simulate the victim accessing the website. Note that the victim initiates the connection via HTTP (e.g., typing the address without https or clicking a non-secure link).
+
+
+```bash
+docker exec ssl_stripping-victim-1 curl http://192.168.10.100
+```
+
+
+### 5. Verify Attack Success
+Check the HTML output received by the victim in the Step 4 terminal.
+
+Expected Result (Compromised):
+```bash
+<a href="http:// www.google.com">
+    <button>Login (Secure HTTPS)</button>
+</a>
+```
+Observation:
+
+The protocol is downgraded from https:// to http://.
+
+There is an extra space after the protocol (http:// ).
+
+
+## Network Topology Diagram(SSL Striping)
 ```mermaid
 graph LR
     subgraph Client_Network ["&nbsp;&nbsp;&nbsp;&nbsp; 🔒 Client Network (10.0.0.0/24) &nbsp;&nbsp;&nbsp;&nbsp;"]
